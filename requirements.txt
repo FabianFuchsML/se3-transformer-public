@@ -1,0 +1,26 @@
+absl-py==0.9.0
+certifi==2019.11.28
+chardet==3.0.4
+cycler==0.10.0
+Cython==0.29.16
+grpcio==1.27.2
+h5py==2.10.0
+idna==2.9
+joblib==0.14.1
+kiwisolver==1.1.0
+Markdown==3.2.1
+matplotlib==3.2.1
+numpy==1.18.2
+protobuf==3.11.3
+pyparsing==2.4.6
+python-dateutil==2.8.1
+requests==2.23.0
+scikit-learn==0.22.2.post1
+scipy==1.4.1
+six==1.14.0
+sklearn==0.0
+tensorboard==1.14.0
+torch==1.4.0
+urllib3==1.25.8
+Werkzeug==1.0.0
+# lie-learn==0.0.0
