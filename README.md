@@ -4,13 +4,11 @@ This repository is the official implementation of [SE(3)-Transformers: 3D Roto-T
 
 Please cite us as
 ```
-@misc{fuchs2020se3transformers,
+@inproceedings{fuchs2020se3transformers,
     title={SE(3)-Transformers: 3D Roto-Translation Equivariant Attention Networks},
     author={Fabian B. Fuchs and Daniel E. Worrall and Volker Fischer and Max Welling},
     year={2020},
-    eprint={2006.10503},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
+    booktitle = {Advances in Neural Information Processing Systems 33 (NeurIPS)},
 }
 ```
 
