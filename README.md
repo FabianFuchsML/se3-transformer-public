@@ -102,6 +102,17 @@ output = fc_layer(features)
 ```
 
 
+## FAQ
+
+Type issues with QM9 experiments:
+
+One user reported that they experienced issues with data types when running the QM9 experiments. For them, adding the following lines just before line 184 of qm9.py fixed the issue:
+```
+x=x.astype(np.float32)
+one_hot=one_hot.astype(np.float32)
+atomic_numbers=atomic_numbers.astype(np.float32)
+```
+
 ## Credit to '3D Steerable CNNs'
 The code in the subfolder `equivariant_attention/from_se3cnn` is strongly based on `https://github.com/mariogeiger/se3cnn` which accompanies the paper '3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data' by Weiler et al.
 
