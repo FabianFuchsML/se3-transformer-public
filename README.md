@@ -104,7 +104,7 @@ output = fc_layer(features)
 
 ## FAQ
 
-Type issues with QM9 experiments:
+**Type issues with QM9 experiments**
 
 One user reported that they experienced issues with data types when running the QM9 experiments. For them, adding the following lines just before line 184 of qm9.py fixed the issue:
 ```
