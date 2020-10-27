@@ -19,7 +19,7 @@ Please cite us as
 (this is important for easier importing from parent folders)
 - [Pytorch](https://pytorch.org/)
 - [DGL](https://www.dgl.ai/)
-  - heads-up: this is a bit of tricky part make work correctly; for us `pip install dgl-cu90==0.4.3.post2` worked; if you use a different version, you might need to do some debugging (I believe expected datatypes for some interfaces changed)
+  - heads-up: this part is a bit tricky to make work correctly; for us `pip install dgl-cu90==0.4.3.post2` worked; if you use a different version, you might need to do some debugging (I believe expected datatypes for some interfaces changed)
 	- to check which CUDA version pytorch is using: `python -c "import torch; print(torch.version.cuda)"`
 	- check [here](https://docs.dgl.ai/install/index.html) for compatibility of DGL with CUDA etc.
     - e.g. for CUDA 9.0: `pip install dgl-cu90==0.4.3.post2`
