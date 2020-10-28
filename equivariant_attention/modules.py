@@ -77,7 +77,7 @@ def get_basis_and_r(G, max_degree):
     # Equivariant basis (dict['d_in><d_out>'])
     basis = get_basis(Y, max_degree)
     # Relative distances (scalar)
-    r = torch.sqrt(torch.sum(r_ij**2, -1, keepdim=True))
+    r = torch.sqrt(torch.sum(G.edata['d']**2, -1, keepdim=True))
     return basis, r
 
 
