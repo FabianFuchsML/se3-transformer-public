@@ -179,7 +179,6 @@ def main(FLAGS, UNPARSED_ARGV):
         train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler, FLAGS)
         val_epoch(epoch, model, task_loss, val_loader, FLAGS)
         test_epoch(epoch, model, task_loss, test_loader, FLAGS)
-        scheduler.step()
 
 
 if __name__ == '__main__':
