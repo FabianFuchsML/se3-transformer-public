@@ -71,10 +71,10 @@ def main(FLAGS, UNPARSED_ARGV):
                                              FLAGS.num_channels,
                                              num_nlayers=FLAGS.num_nlayers,
                                              num_degrees=FLAGS.num_degrees,
-                                             n_bonds=train_dataset.num_bonds,
+                                             edge_dim=train_dataset.num_bonds,
                                              div=FLAGS.div,
                                              pooling=FLAGS.pooling,
-                                             head=FLAGS.head)
+                                             n_heads=FLAGS.head)
     if not FLAGS.restore:
         print("FLAGS.restore must be set")
     model.load_state_dict(torch.load(FLAGS.restore))
