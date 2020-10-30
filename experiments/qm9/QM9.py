@@ -130,7 +130,7 @@ class QM9Dataset(Dataset):
         # Add bonded edges
         for idx in range(edges.shape[0]):
             adjacency[(edges[idx,0], edges[idx,1])] = edges[idx,2]
-            adjacency[(edges[idx,1], edges[idx,2])] = edges[idx,2]
+            adjacency[(edges[idx,1], edges[idx,0])] = edges[idx,2]
 
         # Convert to numpy arrays
         src = []
