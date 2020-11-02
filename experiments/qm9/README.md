@@ -31,8 +31,8 @@ Our model achieves the following performance on (latest results, may not be in p
 | --------------- | ------------| ------------------ |
 | Alpha (bohr^3)) |     .142    |      .002          |
 | Gap (meV)       |     53.0    |      .3            |
-| Lumo (meV)      |     35.0    |      .7            |
-| Homo (meV)      |     33.0    |      .9            |
+| Lumo (meV)      |     33.0    |      .7            |
+| Homo (meV)      |     35.0    |      .9            |
 | Mu (D)          |     .051    |      .001          |
 | Cv (cal/mol K)  |     .054    |      .002          |
 
