@@ -121,7 +121,7 @@ atomic_numbers=atomic_numbers.astype(np.float32)
 
 - We did put significant effort into speeding up the computation of spherical harmonics, in part by parallelising the computation on the GPU (the paper goes into more depth about what we did). A key challenge here is that they depend on the relative distances and hence are different for each point cloud / graph.
 
-- Further speeding up SE3-Transformer type approaches (approaches working with irreducible representations, that is) and potentially making them more memory efficient would certainly be a big step forward. If anyone is interested in researching this direction, we can only encourage them.
+- Further speeding up SE3-Transformer type approaches (approaches working with irreducible representations, that is) and potentially making them more memory efficient would certainly be a big step forward. If I think about why translation-equivariance is part of so many current network architectures (whether the task actually has translational symmetrry or not) and other symmetries are not, the reason is most likely computational efficiency. So, if anyone is interested in researching this direction, we can only encourage them.
 
 *Here are some ideas about speeding up the SE3-Transformer:*
 
