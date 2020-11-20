@@ -64,9 +64,8 @@ class TFN(nn.Module):
         for layer in self.block0:
             h = layer(h, G=G, r=r, basis=basis)
 
-        h = h['0'][...,-1]
         for layer in self.block1:
-            h = layer(G, h)
+            h = layer(h, G)
 
         for layer in self.block2:
             h = layer(h)
