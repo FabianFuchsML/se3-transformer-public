@@ -114,6 +114,24 @@ one_hot=one_hot.astype(np.float32)
 atomic_numbers=atomic_numbers.astype(np.float32)
 ```
 
+
+**Speed**
+
+- Constructing equivariant layers is indeed computationally expensive, one of the bottlenecks being the computation of the spherical harmonics.
+
+- We did put significant effort into speeding up the computation of spherical harmonics, in part by parallelising the computation on the GPU (the paper goes into more depth about what we did). A key challenge here is that they depend on the relative distances and hence are different for each point cloud / graph.
+
+- Further speeding up SE3-Transformer type approaches (approaches working with irreducible representations, that is) and potentially making them more memory efficient would certainly be a big step forward. If I think about why translation-equivariance is part of so many current network architectures (whether the task actually has translational symmetry or not) and other symmetries are not, the reason is most likely computational efficiency. So, if anyone is interested in researching this direction, we can only encourage them.
+
+*Here are some ideas about speeding up the SE3-Transformer:*
+
+- Depending on the dataset and your system requirements, it might be possible to cache the spherical harmonics / basis vectors. This could tremendously speed things up as it basically addresses all the bottlenecks at once.
+
+- A not-so-puristic alternative/version of the above is voxelising the input. This destroys exact equivariance but makes it much easier to cache the spherical harmonics as it reduces the number of overall evaluations.
+
+- Lower hanging fruit: check what part of the network you can make slimmer for a specific task. E.g., the number of degrees makes a big difference in speed & memory and the effect on performance saturates.
+
+
 ## Credit to '3D Steerable CNNs'
 The code in the subfolder `equivariant_attention/from_se3cnn` is strongly based on `https://github.com/mariogeiger/se3cnn` which accompanies the paper '3D Steerable CNNs: Learning Rotationally Equivariant Features in Volumetric Data' by Weiler et al.
 
