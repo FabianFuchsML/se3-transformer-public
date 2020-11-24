@@ -8,7 +8,7 @@ Please cite us as
     title={SE(3)-Transformers: 3D Roto-Translation Equivariant Attention Networks},
     author={Fabian B. Fuchs and Daniel E. Worrall and Volker Fischer and Max Welling},
     year={2020},
-    booktitle = {Advances in Neural Information Processing Systems 33 (NeurIPS)},
+    booktitle = {Advances in Neural Information Processing Systems 34 (NeurIPS)},
 }
 ```
 
