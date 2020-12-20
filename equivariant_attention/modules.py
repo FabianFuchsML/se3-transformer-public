@@ -653,14 +653,27 @@ class GSum(nn.Module):
 
 class GAvgPooling(nn.Module):
     """Graph Average Pooling module."""
-    def __init__(self):
+    def __init__(self, type='0'):
         super().__init__()
         self.pool = AvgPooling()
+        self.type = type
 
     @profile
     def forward(self, features, G, **kwargs):
-        h = features['0'][...,-1]
-        return self.pool(G, h)
+        if self.type == '0':
+            h = features['0'][...,-1]
+            pooled = self.pool(G, h)
+        elif self.type == '1':
+            pooled = []
+            for i in range(3):
+                h_i = features['1'][..., i]
+                pooled.append(self.pool(G, h_i).unsqueeze(-1))
+            pooled = torch.cat(pooled, axis=-1)
+            pooled = {'1': pooled}
+        else:
+            print('GAvgPooling for type > 0 not implemented')
+            exit()
+        return pooled
 
 
 class GMaxPooling(nn.Module):
