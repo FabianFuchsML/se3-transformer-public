@@ -178,8 +178,12 @@ class GConvSE3(nn.Module):
                 G.ndata[k] = v
 
             # Add edge features
-            w = G.edata['w']
-            feat = torch.cat([w, r], -1)
+            if 'w' in G.edata.keys():
+                w = G.edata['w']
+                feat = torch.cat([w, r], -1)
+            else:
+                feat = torch.cat([r, ], -1)
+
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
@@ -452,8 +456,11 @@ class GConvSE3Partial(nn.Module):
                 G.ndata[k] = v
 
             # Add edge features
-            w = G.edata['w']
-            feat = torch.cat([w, r], -1)
+            if 'w' in G.edata.keys():
+                w = G.edata['w'] # shape: [#edges_in_batch, #bond_types]
+                feat = torch.cat([w, r], -1)
+            else:
+                feat = torch.cat([r, ], -1)
             for (mi, di) in self.f_in.structure:
                 for (mo, do) in self.f_out.structure:
                     etype = f'({di},{do})'
