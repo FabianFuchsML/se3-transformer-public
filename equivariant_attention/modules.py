@@ -568,9 +568,14 @@ class GSE3Res(nn.Module):
         self.div = div
         self.n_heads = n_heads
 
+        # f_mid_out has same structure as 'f_out' but #channels divided by 'div'
+        # this will be used for the values
         f_mid_out = {k: int(v // div) for k, v in self.f_out.structure_dict.items()}
         self.f_mid_out = Fiber(dictionary=f_mid_out)
 
+        # f_mid_in has same structure as f_mid_out, but only degrees which are in f_in
+        # this will be used for keys and queries
+        # (queries are merely projected, hence degrees have to match input)
         f_mid_in = {d: m for d, m in f_mid_out.items() if d in self.f_in.degrees}
         self.f_mid_in = Fiber(dictionary=f_mid_in)
 
