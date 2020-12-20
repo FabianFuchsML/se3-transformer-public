@@ -13,10 +13,12 @@ from equivariant_attention.from_se3cnn import utils_steerable
 from equivariant_attention import fibers
 from equivariant_attention.fibers import Fiber, get_fiber_dict, fiber2tensor, fiber2head
 
+import dgl
 import dgl.function as fn # for graphs
 from dgl.nn.pytorch.softmax import edge_softmax
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 
+from packaging import version
 
 ### Equivariant basis construction
 
@@ -478,6 +480,7 @@ class GMABSE3(nn.Module):
         self.f_value = f_value
         self.f_key = f_key
         self.n_heads = n_heads
+        self.new_dgl = version.parse(dgl.__version__) > version.parse('0.4.4')
 
     def __repr__(self):
         return f'GMABSE3(n_heads={self.n_heads}, structure={self.f_value})'
@@ -529,6 +532,11 @@ class GMABSE3(nn.Module):
 
             ## Apply softmax
             e = G.edata.pop('e')
+            if self.new_dgl:
+                # in dgl 5.3, e has an extra dimension compared to dgl 4.3
+                # the following, we get rid of this be reshaping
+                n_edges = G.edata['k'].shape[0]
+                e = e.view([n_edges, self.n_heads])
             e = e / np.sqrt(self.f_key.n_features)
             G.edata['a'] = edge_softmax(G, e)
 
