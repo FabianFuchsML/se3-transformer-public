@@ -264,7 +264,6 @@ if __name__ == '__main__':
         wandb.init(project=f'{FLAGS.wandb}', name=f'{FLAGS.name}')
     else:
         wandb.init(project=f'{FLAGS.wandb}')
-    wandb.init(config=FLAGS)
 
     print("\n\nFLAGS:", FLAGS)
     print("UNPARSED_ARGV:", UNPARSED_ARGV, "\n\n")
