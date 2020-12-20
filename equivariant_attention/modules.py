@@ -278,7 +278,7 @@ class G1x1SE3(nn.Module):
      
     This is equivalent to a self-interaction layer in TensorField Networks.
     """
-    def __init__(self, f_in, f_out):
+    def __init__(self, f_in, f_out, learnable=True):
         """SE(3)-equivariant 1x1 convolution.
 
         Args:
@@ -293,7 +293,7 @@ class G1x1SE3(nn.Module):
         self.transform = nn.ParameterDict()
         for m_out, d_out in self.f_out.structure:
             m_in = self.f_in.structure_dict[d_out]
-            self.transform[str(d_out)] = nn.Parameter(torch.randn(m_out, m_in) / np.sqrt(m_in))
+            self.transform[str(d_out)] = nn.Parameter(torch.randn(m_out, m_in) / np.sqrt(m_in), requires_grad=learnable)
 
     def __repr__(self):
          return f"G1x1SE3(structure={self.f_out})"
@@ -561,7 +561,7 @@ class GMABSE3(nn.Module):
 class GSE3Res(nn.Module):
     """Graph attention block with SE(3)-equivariance and skip connection"""
     def __init__(self, f_in: Fiber, f_out: Fiber, edge_dim: int=0, div: float=4,
-                 n_heads: int=1):
+                 n_heads: int=1, learnable_skip=True):
         super().__init__()
         self.f_in = f_in
         self.f_out = f_out
@@ -592,7 +592,7 @@ class GSE3Res(nn.Module):
         self.GMAB['attn'] = GMABSE3(self.f_mid_out, self.f_mid_in, n_heads=n_heads)
 
         # Skip connections
-        self.project = G1x1SE3(self.f_mid_out, f_out)
+        self.project = G1x1SE3(self.f_mid_out, f_out, learnable=learnable_skip)
         self.add = GSum(f_out, f_in)
 
     @profile
