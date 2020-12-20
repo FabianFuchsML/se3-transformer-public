@@ -301,7 +301,8 @@ class G1x1SE3(nn.Module):
     def forward(self, features, **kwargs):
         output = {}
         for k, v in features.items():
-            output[k] = torch.matmul(self.transform[str(k)], v)
+            if str(k) in self.transform.keys():
+                output[k] = torch.matmul(self.transform[str(k)], v)
         return output
 
 
