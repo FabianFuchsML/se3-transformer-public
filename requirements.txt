@@ -20,7 +20,7 @@ scipy==1.4.1
 six==1.14.0
 sklearn==0.0
 tensorboard==1.14.0
-torch==1.4.0
 urllib3==1.25.8
 Werkzeug==1.0.0
 # lie-learn==0.0.0
+# torch==1.4.0
