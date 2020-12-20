@@ -11,6 +11,7 @@ from scipy.constants import physical_constants
 
 hartree2eV = physical_constants['hartree-electron volt relationship'][0]
 DTYPE = np.float32
+DTYPE_INT = np.int32
 
 class QM9Dataset(Dataset):
     """QM9 dataset."""
@@ -161,6 +162,7 @@ class QM9Dataset(Dataset):
         # Load edge features
         num_bonds = self.get('num_bonds', idx)
         edge = self.get('edge', idx)[:num_bonds]
+        edge = np.asarray(edge, dtype=DTYPE_INT)
 
         # Load target
         y = self.get_target(idx, normalize=True).astype(DTYPE)
@@ -181,12 +183,12 @@ class QM9Dataset(Dataset):
         G = dgl.DGLGraph((src, dst))
 
         # Add node features to graph
-        G.ndata['x'] = x
-        G.ndata['f'] = np.concatenate([one_hot, atomic_numbers], -1)[...,None]
+        G.ndata['x'] = torch.tensor(x) #[num_atoms,3]
+        G.ndata['f'] = torch.tensor(np.concatenate([one_hot, atomic_numbers], -1)[...,None]) #[num_atoms,6,1]
 
         # Add edge features to graph
-        G.edata['d'] = x[dst] - x[src]
-        G.edata['w'] = w
+        G.edata['d'] = torch.tensor(x[dst] - x[src]) #[num_atoms,3]
+        G.edata['w'] = torch.tensor(w) #[num_atoms,4]
 
         return G, y
 
