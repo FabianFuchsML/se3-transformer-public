@@ -34,6 +34,7 @@ class Fiber(object):
         self.max_degree = max(self.degrees)
         self.min_degree = min(self.degrees)
         self.structure_dict = {k: v for v, k in self.structure}
+        self.dict = self.structure_dict
         self.n_features = np.sum([i[0] * (2*i[1]+1) for i in self.structure])
 
         self.feature_indices = {}
