@@ -14,13 +14,12 @@ from equivariant_attention import fibers
 from equivariant_attention.fibers import Fiber, get_fiber_dict, fiber2tensor, fiber2head
 
 import dgl
-import dgl.function as fn # for graphs
+import dgl.function as fn  # for graphs
 from dgl.nn.pytorch.softmax import edge_softmax
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 
 from packaging import version
 
-### Equivariant basis construction
 
 @profile
 def get_basis(Y, max_degree):
