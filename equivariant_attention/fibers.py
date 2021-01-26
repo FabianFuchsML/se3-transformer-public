@@ -14,6 +14,15 @@ class Fiber(object):
     """A Handy Data Structure for Fibers"""
     def __init__(self, num_degrees: int=None, num_channels: int=None,
                  structure: List[Tuple[int,int]]=None, dictionary=None):
+        """
+        define fiber structure; use one num_degrees & num_channels OR structure
+        OR dictionary
+
+        :param num_degrees: degrees will be [0, ..., num_degrees-1]
+        :param num_channels: number of channels, same for each degree
+        :param structure: e.g. [(32, 0),(16, 1),(16,2)]
+        :param dictionary: e.g. {0:32, 1:16, 2:16}
+        """
         if structure:
             self.structure = structure
         elif dictionary:
