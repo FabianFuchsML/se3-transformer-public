@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 from equivariant_attention.modules import get_basis_and_r, GSE3Res, GNormBias
 from equivariant_attention.fibers import Fiber
@@ -14,7 +15,7 @@ class SE3Transformer(nn.Module):
         self.num_layers = num_layers
         self.num_channels = num_channels
         self.num_degrees = num_degrees
-        self.edge_dim = 0
+        self.edge_dim = 1
         self.div = div
         self.n_heads = n_heads
         self.si_m, self.si_e = si_m, si_e

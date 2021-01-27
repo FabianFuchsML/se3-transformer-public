@@ -107,6 +107,7 @@ class RIDataset(torch.utils.data.Dataset):
         G.ndata['v'] = torch.unsqueeze(v_0, dim=1)  # [N, 1, 3]
         G.ndata['c'] = torch.unsqueeze(charges, dim=1)  # [N, 1, 1]
         G.edata['d'] = x_0[indices_dst] - x_0[indices_src]  # relative postions
+        G.edata['w'] = charges[indices_dst] * charges[indices_src]
 
         r = torch.sqrt(torch.sum(G.edata['d'] ** 2, -1, keepdim=True))
 
