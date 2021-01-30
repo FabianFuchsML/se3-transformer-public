@@ -245,8 +245,8 @@ if __name__ == '__main__':
     # Type of self-interaction in attention layers,
     # valid: '1x1' (simple) and 'att' (attentive) with a lot more parameters
     parser.add_argument('--simid', type=str, default='1x1',)
-    parser.add_argument('--siend', type=str, default='1x1')
-    parser.add_argument('--xij', type=str, default=None)
+    parser.add_argument('--siend', type=str, default='att')
+    parser.add_argument('--xij', type=str, default='add')
 
     # Meta-parameters
     parser.add_argument('--batch_size', type=int, default=10,
