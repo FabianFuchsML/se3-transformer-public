@@ -6,7 +6,7 @@ import pickle
 import gzip
 import os
 import sys
-import fcntl
+import portalocker
 
 
 class FileSystemMutex:
@@ -24,7 +24,8 @@ class FileSystemMutex:
         if it is already locked, it waits (blocking function)
         '''
         self.handle = open(self.filename, 'w')
-        fcntl.lockf(self.handle, fcntl.LOCK_EX)
+        # fcntl.lockf(self.handle, fcntl.LOCK_EX)
+        portalocker.lock(self.handle, portalocker.LOCK_EX)
         self.handle.write("{}\n".format(os.getpid()))
         self.handle.flush()
 
@@ -34,7 +35,8 @@ class FileSystemMutex:
         '''
         if self.handle is None:
             raise RuntimeError()
-        fcntl.lockf(self.handle, fcntl.LOCK_UN)
+        # fcntl.lockf(self.handle, fcntl.LOCK_UN)
+        portalocker.unlock(self.handle)
         self.handle.close()
         self.handle = None
 
