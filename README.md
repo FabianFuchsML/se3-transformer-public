@@ -31,7 +31,7 @@ Please cite us as
     - e.g. for CUDA 10.2: `pip install dgl-cu102==0.4.3.post2`</del>
   - <del> if you get the error “libcublas.so.10: cannot open shared object file: No such file or directory”, running this command might help: `pip install torch-cluster==latest+cu101 -f https://pytorch-geometric.com/whl/torch-1.4.0.html`  </del>
   - please help us making this part more robust: tell us what you did to make it work on your specific system and we'll put it here
-- pip install packaging
+- `pip install packaging`
 - optional: [Weights & Biases](https://www.wandb.com/)
   - install with `pip install wandb`
 - optional: install the lie learn library via: `pip install git+https://github.com/AMLab-Amsterdam/lie_learn`
