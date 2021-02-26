@@ -28,7 +28,7 @@ def get_flags():
                         help=_SELF_INTERACTION_HELP.format('middle layers'))
     parser.add_argument('--siend', type=str, default='1x1',
                         help=_SELF_INTERACTION_HELP.format('output layer'))
-    parser.add_argument('--xij', type=str, default=None)
+    parser.add_argument('--xij', type=str, default='add')
     parser.add_argument('--basis_gradients', type=int, default=1)
 
     # Parameters for the gradient descent baseline
@@ -38,14 +38,14 @@ def get_flags():
                         help="Initial step size for gradient descent baseline")
 
     # Meta-parameters
-    parser.add_argument('--batch_size', type=int, default=10,
+    parser.add_argument('--batch_size', type=int, default=128,
                         help="Batch size")
     parser.add_argument('--lr', type=float, default=1e-3,
                         help="Learning rate")
-    parser.add_argument('--num_epochs', type=int, default=500,
+    parser.add_argument('--num_epochs', type=int, default=100,
                         help="Number of epochs")
-    parser.add_argument('--n_points', type=int, default=5)
-    parser.add_argument('--k_neighbors', type=int, default=5)
+    parser.add_argument('--n_points', type=int, default=10)
+    parser.add_argument('--k_neighbors', type=int, default=10)
 
     # Logging
     parser.add_argument('--epoch_length', type=int, default=5000)
@@ -72,7 +72,7 @@ def get_flags():
                         help="Exit after 10 steps for profiling")
     parser.add_argument('--forward', type=int, default=0,
                         help="Run forward pass")
-    parser.add_argument('--gd_post_process', type=int, default=0,
+    parser.add_argument('--gd_post_process', type=int, default=1,
                         help="Run gradient descent after the model to fine tune the results")
     parser.add_argument('--num_runs', type=int, default=1,
                         help="Number of experiments to run sequentially")
