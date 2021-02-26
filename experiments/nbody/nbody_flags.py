@@ -41,7 +41,7 @@ def get_flags():
                                  'springs_infer'])
     # location of data for relational inference
     parser.add_argument('--ri_data', type=str, default='data_generation')
-    parser.add_argument('--data_str', type=str, default='5_nobox_mailvolker')
+    parser.add_argument('--data_str', type=str, default='my_datasetfile')
     # how many time steps to predict into the future
     parser.add_argument('--ri_delta_t', type=int, default=10)
     # how many time steps to cut off from dataset in the beginning
