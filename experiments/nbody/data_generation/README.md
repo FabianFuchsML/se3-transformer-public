@@ -14,5 +14,5 @@ The following is a suggested configuration for creating a dataset
 of 20 bodies with random charges
 
 ```
-python3 generate_dataset.py --num-train 30000 --num-test 5000 --n-balls 20 []()
+python3 generate_dataset.py --num-train 30000 --num-test 5000 --n-balls 20
 ```
