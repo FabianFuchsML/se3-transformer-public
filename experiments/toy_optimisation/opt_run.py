@@ -259,8 +259,7 @@ os.makedirs(FLAGS.save_dir, exist_ok=True)
 for run in range(FLAGS.num_runs):
     try:
         # Log all args to wandb
-        with wandb.init(entity='my_username', project='iterativeSE3',
-                        name=f'{FLAGS.name}{run:02d}', config=FLAGS, reinit=True):
+        with wandb.init(project='iterativeSE3', name=f'{FLAGS.name}{run:02d}', config=FLAGS, reinit=True):
             wandb.save('*.txt')
             wandb.save('*.pkl')
 
