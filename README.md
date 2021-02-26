@@ -15,7 +15,8 @@ Please cite us as
 
 ## Prerequisites
 
-*update 2020/12/22: we made some updates to support dgl >= dgl0.5.0; it is tested with the combinations dgl0.5.3 & torch 1.7 and dgl0.4.3.post2 & torch 1.4*
+***update 2020/12/22: we made some updates to support dgl >= dgl0.5.0; it is tested with the combinations dgl0.5.3 & torch 1.7 and dgl0.4.3.post2 & torch 1.4
+We recommend using dgl 0.5.3 & torch 1.7***
 
 - Install this repo in your virtual environment as `pip install -e .`
 (this is important for easier importing from parent folders)
