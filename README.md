@@ -22,13 +22,13 @@ Please cite us as
 (this is important for easier importing from parent folders)
 - [Pytorch](https://pytorch.org/)
 - [DGL](https://www.dgl.ai/)
-  - <del> heads-up </del> : this part is a bit tricky to make work correctly; for us `pip install dgl-cu90==0.4.3.post2` worked; if you use a different version, you might need to do some debugging (I believe expected datatypes for some interfaces changed)
+  - <del> heads-up : this part is a bit tricky to make work correctly; for us `pip install dgl-cu90==0.4.3.post2` worked; if you use a different version, you might need to do some debugging (I believe expected datatypes for some interfaces changed)
 	- to check which CUDA version pytorch is using: `python -c "import torch; print(torch.version.cuda)"`
 	- check [here](https://docs.dgl.ai/install/index.html) for compatibility of DGL with CUDA etc.
     - e.g. for CUDA 9.0: `pip install dgl-cu90==0.4.3.post2`
     - e.g. for CUDA 10.1: `pip install dgl-cu101==0.4.3.post2`
     - e.g. for CUDA 10.2: `pip install dgl-cu102==0.4.3.post2`
-  - if you get the error “libcublas.so.10: cannot open shared object file: No such file or directory”, running this command might help: `pip install torch-cluster==latest+cu101 -f https://pytorch-geometric.com/whl/torch-1.4.0.html`
+  - if you get the error “libcublas.so.10: cannot open shared object file: No such file or directory”, running this command might help: `pip install torch-cluster==latest+cu101 -f https://pytorch-geometric.com/whl/torch-1.4.0.html`  </del>
   - please help us making this part more robust: tell us what you did to make it work on your specific system and we'll put it here
 - optional: [Weights & Biases](https://www.wandb.com/)
   - install with `pip install wandb`
