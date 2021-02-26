@@ -1,20 +1,20 @@
-from utils.utils_profiling import * # load before other local modules
+from utils.utils_profiling import *  # load before other local modules
 
-import math
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import copy
 
-from typing import Dict, List, Tuple
+from contextlib import nullcontext
+
+from typing import Dict
 
 from equivariant_attention.from_se3cnn import utils_steerable
-from equivariant_attention import fibers
-from equivariant_attention.fibers import Fiber, get_fiber_dict, fiber2head
+from equivariant_attention.fibers import Fiber, fiber2head
+from utils.utils_logging import log_gradient_norm
 
 import dgl
-import dgl.function as fn  # for graphs
+import dgl.function as fn
 from dgl.nn.pytorch.softmax import edge_softmax
 from dgl.nn.pytorch.glob import AvgPooling, MaxPooling
 
@@ -22,20 +22,39 @@ from packaging import version
 
 
 @profile
-def get_basis(Y, max_degree):
-    """Precompute the SE(3)-equivariant weight basis.
+def get_basis(G, max_degree, compute_gradients):
+    """Precompute the SE(3)-equivariant weight basis, W_J^lk(x)
 
     This is called by get_basis_and_r().
 
     Args:
-        Y: spherical harmonic dict, returned by utils_steerable.precompute_sh()
+        G: DGL graph instance of type dgl.DGLGraph
         max_degree: non-negative int for degree of highest feature type
+        compute_gradients: boolean, whether to compute gradients during basis construction
     Returns:
-        dict of equivariant bases, keys are in form '<d_in><d_out>'
+        dict of equivariant bases. Keys are in the form 'd_in,d_out'. Values are
+        tensors of shape (batch_size, 1, 2*d_out+1, 1, 2*d_in+1, number_of_bases)
+        where the 1's will later be broadcast to the number of output and input
+        channels
     """
-    device = Y[0].device
-    # No need to backprop through the basis construction
-    with torch.no_grad():
+    if compute_gradients:
+        context = nullcontext()
+    else:
+        context = torch.no_grad()
+
+    with context:
+        cloned_d = torch.clone(G.edata['d'])
+
+        if G.edata['d'].requires_grad:
+            cloned_d.requires_grad_()
+            log_gradient_norm(cloned_d, 'Basis computation flow')
+
+        # Relative positional encodings (vector)
+        r_ij = utils_steerable.get_spherical_from_cartesian_torch(cloned_d)
+        # Spherical harmonic basis
+        Y = utils_steerable.precompute_sh(r_ij, 2*max_degree)
+        device = Y[0].device
+
         basis = {}
         for d_in in range(max_degree+1):
             for d_out in range(max_degree+1):
@@ -50,52 +69,57 @@ def get_basis(Y, max_degree):
                     K_Js.append(K_J)
 
                 # Reshape so can take linear combinations with a dot product
-                size = (-1, 1, 2*d_out+1, 1, 2*d_in+1, 2*min(d_in,d_out)+1)
+                size = (-1, 1, 2*d_out+1, 1, 2*d_in+1, 2*min(d_in, d_out)+1)
                 basis[f'{d_in},{d_out}'] = torch.stack(K_Js, -1).view(*size)
         return basis
 
 
-def get_basis_and_r(G, max_degree):
+def get_r(G):
+    """Compute internodal distances"""
+    cloned_d = torch.clone(G.edata['d'])
+
+    if G.edata['d'].requires_grad:
+        cloned_d.requires_grad_()
+        log_gradient_norm(cloned_d, 'Neural networks flow')
+
+    return torch.sqrt(torch.sum(cloned_d**2, -1, keepdim=True))
+
+
+def get_basis_and_r(G, max_degree, compute_gradients=False):
     """Return equivariant weight basis (basis) and internodal distances (r).
 
     Call this function *once* at the start of each forward pass of the model.
-    It computes the equivariant weight basis, W_J^lk(x), and internodal 
+    It computes the equivariant weight basis, W_J^lk(x), and internodal
     distances, needed to compute varphi_J^lk(x), of eqn 8 of
-    https://arxiv.org/pdf/2006.10503.pdf. The return values of this function 
+    https://arxiv.org/pdf/2006.10503.pdf. The return values of this function
     can be shared as input across all SE(3)-Transformer layers in a model.
 
     Args:
         G: DGL graph instance of type dgl.DGLGraph()
         max_degree: non-negative int for degree of highest feature-type
+        compute_gradients: controls whether to compute gradients during basis construction
     Returns:
         dict of equivariant bases, keys are in form '<d_in><d_out>'
         vector of relative distances, ordered according to edge ordering of G
     """
-    # Relative positional encodings (vector)
-    r_ij = utils_steerable.get_spherical_from_cartesian_torch(G.edata['d'])
-    # Spherical harmonic basis
-    Y = utils_steerable.precompute_sh(r_ij, 2*max_degree)
-    # Equivariant basis (dict['d_in><d_out>'])
-    basis = get_basis(Y, max_degree)
-    # Relative distances (scalar)
-    r = torch.sqrt(torch.sum(G.edata['d']**2, -1, keepdim=True))
+    basis = get_basis(G, max_degree, compute_gradients)
+    r = get_r(G)
     return basis, r
-
 
 
 ### SE(3) equivariant operations on graphs in DGL
 
 class GConvSE3(nn.Module):
     """A tensor field network layer as a DGL module.
-    
-    GConvSE3 stands for a Graph Convolution SE(3)-equivariant layer. It is the 
+
+    GConvSE3 stands for a Graph Convolution SE(3)-equivariant layer. It is the
     equivalent of a linear layer in an MLP, a conv layer in a CNN, or a graph
     conv layer in a GCN.
 
     At each node, the activations are split into different "feature types",
     indexed by the SE(3) representation type: non-negative integers 0, 1, 2, ..
     """
-    def __init__(self, f_in, f_out, self_interaction: bool=False, edge_dim: int=0):
+    def __init__(self, f_in, f_out, self_interaction: bool=False, edge_dim: int=0, flavor='skip'):
         """SE(3)-equivariant Graph Conv Layer
 
         Args:
@@ -103,12 +127,14 @@ class GConvSE3(nn.Module):
             f_out: list of tuples [(multiplicities, type),...]
             self_interaction: include self-interaction in convolution
             edge_dim: number of dimensions for edge embedding
+            flavor: allows ['TFN', 'skip'], where 'skip' adds a skip connection
         """
         super().__init__()
         self.f_in = f_in
         self.f_out = f_out
         self.edge_dim = edge_dim
         self.self_interaction = self_interaction
+        self.flavor = flavor
 
         # Neighbor -> center weights
         self.kernel_unary = nn.ModuleDict()
@@ -119,11 +145,18 @@ class GConvSE3(nn.Module):
         # Center -> center weights
         self.kernel_self = nn.ParameterDict()
         if self_interaction:
-            for m_in, d_in in self.f_in.structure:
-                if d_in in self.f_out.degrees:
-                    m_out = self.f_out.structure_dict[d_in]
-                    W = nn.Parameter(torch.randn(1, m_out, m_in) / np.sqrt(m_in))
-                    self.kernel_self[f'{d_in}'] = W
+            assert self.flavor in ['TFN', 'skip']
+            if self.flavor == 'TFN':
+                for m_out, d_out in self.f_out.structure:
+                    W = nn.Parameter(torch.randn(1, m_out, m_out) / np.sqrt(m_out))
+                    self.kernel_self[f'{d_out}'] = W
+            elif self.flavor == 'skip':
+                for m_in, d_in in self.f_in.structure:
+                    if d_in in self.f_out.degrees:
+                        m_out = self.f_out.structure_dict[d_in]
+                        W = nn.Parameter(torch.randn(1, m_out, m_in) / np.sqrt(m_in))
+                        self.kernel_self[f'{d_in}'] = W
+
 
 
     def __repr__(self):
@@ -152,9 +185,13 @@ class GConvSE3(nn.Module):
             # Center -> center messages
             if self.self_interaction:
                 if f'{d_out}' in self.kernel_self.keys():
-                    dst = edges.dst[f'{d_out}']
-                    W = self.kernel_self[f'{d_out}']
-                    msg = msg + torch.matmul(W, dst)
+                    if self.flavor == 'TFN':
+                        W = self.kernel_self[f'{d_out}']
+                        msg = torch.matmul(W, msg)
+                    if self.flavor == 'skip':
+                        dst = edges.dst[f'{d_out}']
+                        W = self.kernel_self[f'{d_out}']
+                        msg = msg + torch.matmul(W, dst)
 
             return {'msg': msg.view(msg.shape[0], -1, 2*d_out+1)}
         return fnc
@@ -168,7 +205,7 @@ class GConvSE3(nn.Module):
             h: dict of features
             r: inter-atomic distances
             basis: pre-computed Q * Y
-        Returns: 
+        Returns:
             tensor with new features [B, n_points, n_features_out]
         """
         with G.local_scope():
@@ -213,14 +250,14 @@ class RadialFunc(nn.Module):
         self.out_dim = out_dim
         self.edge_dim = edge_dim
 
-        self.net = nn.Sequential(nn.Linear(self.edge_dim+1,self.mid_dim), 
+        self.net = nn.Sequential(nn.Linear(self.edge_dim+1,self.mid_dim),
                                  BN(self.mid_dim),
-                                 nn.ReLU(), 
+                                 nn.ReLU(),
                                  nn.Linear(self.mid_dim,self.mid_dim),
                                  BN(self.mid_dim),
-                                 nn.ReLU(), 
+                                 nn.ReLU(),
                                  nn.Linear(self.mid_dim,self.num_freq*in_dim*out_dim))
-        
+
         nn.init.kaiming_uniform_(self.net[0].weight)
         nn.init.kaiming_uniform_(self.net[3].weight)
         nn.init.kaiming_uniform_(self.net[6].weight)
@@ -235,11 +272,11 @@ class RadialFunc(nn.Module):
 
 class PairwiseConv(nn.Module):
     """SE(3)-equivariant convolution between two single-type features"""
-    def __init__(self, degree_in: int, nc_in: int, degree_out: int, 
+    def __init__(self, degree_in: int, nc_in: int, degree_out: int,
                  nc_out: int, edge_dim: int=0):
         """SE(3)-equivariant convolution between a pair of feature types.
 
-        This layer performs a convolution from nc_in features of type degree_in 
+        This layer performs a convolution from nc_in features of type degree_in
         to nc_out features of type degree_out.
 
         Args:
@@ -274,7 +311,7 @@ class PairwiseConv(nn.Module):
 
 class G1x1SE3(nn.Module):
     """Graph Linear SE(3)-equivariant layer, equivalent to a 1x1 convolution.
-     
+
     This is equivalent to a self-interaction layer in TensorField Networks.
     """
     def __init__(self, f_in, f_out, learnable=True):
@@ -424,15 +461,15 @@ class GAttentiveSelfInt(nn.Module):
 
 class GNormSE3(nn.Module):
     """Graph Norm-based SE(3)-equivariant nonlinearity.
-    
-    Nonlinearities are important in SE(3) equivariant GCNs. They are also quite 
+
+    Nonlinearities are important in SE(3) equivariant GCNs. They are also quite
     expensive to compute, so it is convenient for them to share resources with
     other layers, such as normalization. The general workflow is as follows:
 
     > for feature type in features:
     >    norm, phase <- feature
     >    output = fnc(norm) * phase
-    
+
     where fnc: {R+}^m -> R^m is a learnable map from m norms to m scalars.
     """
     def __init__(self, fiber, nonlin=nn.ReLU(inplace=True), num_layers: int=0):
@@ -511,8 +548,8 @@ class GConvSE3Partial(nn.Module):
         """SE(3)-equivariant partial convolution.
 
         A partial convolution computes the inner product between a kernel and
-        each input channel, without summing over the result from each input 
-        channel. This unfolded structure makes it amenable to be used for 
+        each input channel, without summing over the result from each input
+        channel. This unfolded structure makes it amenable to be used for
         computing the value-embeddings of the attention mechanism.
 
         Args:
@@ -591,7 +628,7 @@ class GConvSE3Partial(nn.Module):
             G: minibatch of (homo)graphs
             r: inter-atomic distances
             basis: pre-computed Q * Y
-        Returns: 
+        Returns:
             tensor with new features [B, n_points, n_features_out]
         """
         with G.local_scope():
@@ -666,7 +703,7 @@ class GMABSE3(nn.Module):
             v: dict of value edge-features
             k: dict of key edge-features
             q: dict of query node-features
-        Returns: 
+        Returns:
             tensor with new features [B, n_points, n_features_out]
         """
         with G.local_scope():
@@ -691,7 +728,7 @@ class GMABSE3(nn.Module):
             e = e / np.sqrt(self.f_key.n_features)
             G.edata['a'] = edge_softmax(G, e)
 
-            # Perform attention-weighted message-passing 
+            # Perform attention-weighted message-passing
             for d in self.f_value.degrees:
                 G.update_all(self.udf_u_mul_e(d), fn.sum('m', f'out{d}'))
 

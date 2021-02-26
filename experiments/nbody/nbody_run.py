@@ -22,6 +22,7 @@ from utils import utils_logging
 
 from experiments.nbody import nbody_models as models
 from equivariant_attention.from_se3cnn.SO3 import rot
+from experiments.nbody.nbody_flags import get_flags
 
 
 def to_np(x):
@@ -190,14 +191,11 @@ def main(FLAGS, UNPARSED_ARGV):
     FLAGS.test_size = len(test_dataset)
     assert len(test_dataset) < len(train_dataset)
 
-    model = models.__dict__.get(FLAGS.model)(
-        FLAGS.num_layers, FLAGS.num_channels, num_degrees=FLAGS.num_degrees,
-        div=FLAGS.div, n_heads=FLAGS.head, si_m=FLAGS.simid, si_e=FLAGS.siend,
-        x_ij=FLAGS.xij)
+    model = models.__dict__.get(FLAGS.model)(FLAGS.num_layers, FLAGS.num_channels, num_degrees=FLAGS.num_degrees,
+                                             div=FLAGS.div, n_heads=FLAGS.head, si_m=FLAGS.simid, si_e=FLAGS.siend,
+                                             x_ij=FLAGS.xij)
 
-    _ = utils_logging.write_info_file(model, FLAGS=FLAGS,
-                                      UNPARSED_ARGV=UNPARSED_ARGV,
-                                      wandb_log_dir=wandb.run.dir)
+    utils_logging.write_info_file(model, FLAGS=FLAGS, UNPARSED_ARGV=UNPARSED_ARGV, wandb_log_dir=wandb.run.dir)
 
     if FLAGS.restore is not None:
         model.load_state_dict(torch.load(FLAGS.restore))
@@ -205,8 +203,7 @@ def main(FLAGS, UNPARSED_ARGV):
 
     # Optimizer settings
     optimizer = optim.Adam(model.parameters(), lr=FLAGS.lr)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, FLAGS.num_epochs, eta_min=1e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, FLAGS.num_epochs, eta_min=1e-4)
     criterion = nn.MSELoss()
     criterion = criterion.to(FLAGS.device)
     task_loss = criterion
@@ -220,102 +217,23 @@ def main(FLAGS, UNPARSED_ARGV):
         torch.save(model.state_dict(), save_path)
         print(f"Saved: {save_path}")
 
-        train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler,
-                    FLAGS)
+        train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler, FLAGS)
         test_epoch(epoch, model, task_loss, test_loader, FLAGS, dT)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
 
-    # Model parameters
-    parser.add_argument('--model', type=str, default='SE3Transformer',
-                        help="String name of model")
-    parser.add_argument('--num_layers', type=int, default=4,
-                        help="Number of equivariant layers")
-    parser.add_argument('--num_degrees', type=int, default=3,
-                        help="Number of irreps {0,1,...,num_degrees-1}")
-    parser.add_argument('--num_channels', type=int, default=4,
-                        help="Number of channels in middle layers")
-    parser.add_argument('--div', type=float, default=1,
-                        help="Low dimensional embedding fraction")
-    parser.add_argument('--head', type=int, default=1,
-                        help="Number of attention heads")
-
-    # Type of self-interaction in attention layers,
-    # valid: '1x1' (simple) and 'att' (attentive) with a lot more parameters
-    parser.add_argument('--simid', type=str, default='1x1',)
-    parser.add_argument('--siend', type=str, default='att')
-    parser.add_argument('--xij', type=str, default='add')
-
-    # Meta-parameters
-    parser.add_argument('--batch_size', type=int, default=10,
-                        help="Batch size")
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help="Learning rate")
-    parser.add_argument('--num_epochs', type=int, default=500,
-                        help="Number of epochs")
-
-    # Data
-    # An argument to specify which dataset type to use (for now)
-    parser.add_argument('--ri_data_type', type=str, default="charged",
-                        choices=['charged', 'charged_infer', 'springs',
-                                 'springs_infer'])
-    # location of data for relational inference
-    parser.add_argument('--ri_data', type=str, default=None)
-    parser.add_argument('--data_str', type=str, default=None)
-    # how many time steps to predict into the future
-    parser.add_argument('--ri_delta_t', type=int, default=10)
-    # how many time steps to cut off from dataset in the beginning
-    parser.add_argument('--ri_burn_in', type=int, default=10)
-    parser.add_argument('--ri_start_at', type=str, default='all')
-
-    # Logging
-    parser.add_argument('--name', type=str, default='ri_dgl', help="Run name")
-    parser.add_argument('--log_interval', type=int, default=25,
-                        help="Number of steps between logging key stats")
-    parser.add_argument('--print_interval', type=int, default=250,
-                        help="Number of steps between printing key stats")
-    parser.add_argument('--save_dir', type=str, default="models",
-                        help="Directory name to save models")
-    parser.add_argument('--restore', type=str, default=None,
-                        help="Path to model to restore")
-    parser.add_argument('--verbose', type=int, default=0)
-
-    # Miscellanea
-    parser.add_argument('--num_workers', type=int, default=4,
-                        help="Number of data loader workers")
-    parser.add_argument('--profile', action='store_true',
-                        help="Exit after 10 steps for profiling")
-
-    # Random seed for both Numpy and Pytorch
-    parser.add_argument('--seed', type=int, default=None)
-
-    FLAGS, UNPARSED_ARGV = parser.parse_known_args()
-
-    # Create model directory
-    if not os.path.isdir(FLAGS.save_dir):
-        os.makedirs(FLAGS.save_dir)
-
-    # Fix seed for random numbers
-    if not FLAGS.seed: FLAGS.seed = 1992  # np.random.randint(100000)
-    torch.manual_seed(FLAGS.seed)
-    np.random.seed(FLAGS.seed)
-
-    # Automatically choose GPU if available
-    FLAGS.device = torch.device(
-        'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    FLAGS, UNPARSED_ARGV = get_flags()
+    os.makedirs(FLAGS.save_dir, exist_ok=True)
 
     # Log all args to wandb
-    wandb.init(project='nbody', name=FLAGS.name, config=FLAGS)
+    wandb.init(project='equivariant-attention', name=FLAGS.name, config=FLAGS)
     wandb.save('*.txt')
-
-    print("\n\nFLAGS:", FLAGS)
-    print("UNPARSED_ARGV:", UNPARSED_ARGV, "\n\n")
 
     # Where the magic is
     try:
         main(FLAGS, UNPARSED_ARGV)
     except Exception:
-        import pdb
+        import pdb, traceback
+        traceback.print_exc()
         pdb.post_mortem()

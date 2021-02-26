@@ -4,10 +4,18 @@ import time
 import datetime
 import subprocess
 import numpy as np
+import torch
+
+from utils.utils_data import to_np
+
+
+_global_log = {}
+
 
 def try_mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path)
+
 
 # @profile
 def make_logdir(checkpoint_dir, run_name=None):
@@ -20,6 +28,7 @@ def make_logdir(checkpoint_dir, run_name=None):
     log_dir = os.path.join(checkpoint_dir, now)
     try_mkdir(log_dir)
     return log_dir
+
 
 def count_parameters(model):
     """
@@ -38,13 +47,14 @@ def write_info_file(model, FLAGS, UNPARSED_ARGV, wandb_log_dir=None):
     filename_git_diff = "git_diff_" + time_str + ".txt"
 
     checkpoint_name = 'model'
+
     if wandb_log_dir:
         log_dir = wandb_log_dir
         os.mkdir(os.path.join(log_dir, 'checkpoints'))
         checkpoint_path = os.path.join(log_dir, 'checkpoints', checkpoint_name)
     elif FLAGS.restore:
         # set restore path
-        assert (FLAGS.run_name != None)
+        assert FLAGS.run_name is not None
         log_dir = os.path.join(FLAGS.checkpoint_dir, FLAGS.run_name)
         checkpoint_path = os.path.join(log_dir, 'checkpoints', checkpoint_name)
     else:
@@ -65,7 +75,8 @@ def write_info_file(model, FLAGS, UNPARSED_ARGV, wandb_log_dir=None):
         file.write(key + ': ' + str(vars(FLAGS)[key]) + '\n')
 
     # count number of parameters
-    file.write('\nNumber of Model Parameters: ' + str(count_parameters(model)) + '\n')
+    if hasattr(model, 'parameters'):
+        file.write('\nNumber of Model Parameters: ' + str(count_parameters(model)) + '\n')
     if hasattr(model, 'enc'):
         file.write('\nNumber of Encoder Parameters: ' + str(
             count_parameters(model.enc)) + '\n')
@@ -85,3 +96,28 @@ def write_info_file(model, FLAGS, UNPARSED_ARGV, wandb_log_dir=None):
     subprocess.call(["git diff > " + os.path.join(log_dir, filename_git_diff)], shell=True)
 
     return log_dir, checkpoint_path
+
+
+def log_gradient_norm(tensor, variable_name):
+    if variable_name not in _global_log:
+        _global_log[variable_name] = []
+
+    def log_gradient_norm_inner(gradient):
+        gradient_norm = torch.norm(gradient, dim=-1)
+        _global_log[variable_name].append(to_np(gradient_norm))
+
+    tensor.register_hook(log_gradient_norm_inner)
+
+
+def get_average(variable_name):
+    if variable_name not in _global_log:
+        return float('nan')
+    elif _global_log[variable_name]:
+        overall_tensor = np.concatenate(_global_log[variable_name])
+        return np.mean(overall_tensor)
+    else:
+        return 0
+
+
+def clear_data(variable_name):
+    _global_log[variable_name] = []
