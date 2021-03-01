@@ -44,7 +44,7 @@ Check `requirements.txt` for other dependencies
 
 The code for experiments specific is meant to be placed in the folder [experiments](https://github.com/FabianFuchsML/se3-transformer-public/tree/master/experiments).
 
-We provide the implementation for the QM9 experiments. Please feel free to use this as a template for any other regression or classification task on graph or point cloud data.
+We provide an implementation for the n-body experiment, the QM9 experiments. In addition, we provide a multi-step toy-optimisation experiment losely inspired the by protein structure prediction task.
 
 
 ## Basic usage
