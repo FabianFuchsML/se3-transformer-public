@@ -63,7 +63,8 @@ def get_basis(G, max_degree, compute_gradients):
                     # Get spherical harmonic projection matrices
                     Q_J = utils_steerable._basis_transformation_Q_J(J, d_in, d_out)
                     Q_J = Q_J.float().T.to(device)
-
+                    Y[J] = Y[J].float()
+                    
                     # Create kernel from spherical harmonics
                     K_J = torch.matmul(Y[J], Q_J)
                     K_Js.append(K_J)
