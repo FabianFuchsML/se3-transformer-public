@@ -4,41 +4,71 @@ import argparse
 import os
 import sys
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.filterwarnings('ignore')
 
 import dgl
 import math
 import numpy as np
 import torch
+import wandb
 
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from QM9 import QM9Dataset
+from alpha import AlphaDataset
 
-from experiments.qm9 import models #as models
+from experiments.alpha import models #as models
 
 def to_np(x):
     return x.cpu().detach().numpy()
+
+def train_epoch(epoch, model, loss_fnc, dataloader, optimizer, scheduler, FLAGS):
+    model.train()
+
+    num_iters = len(dataloader)
+    for i, (g, y) in enumerate(dataloader):
+        g = g.to(FLAGS.device)
+        y = y.to(FLAGS.device)
+
+        optimizer.zero_grad()
+
+        # run model forward and compute loss
+        # pred = model(g)
+        pred, embedding = model(g)
+        l1_loss, __, rescale_loss = loss_fnc(pred, y)
+
+        # backprop
+        l1_loss.backward()
+        optimizer.step()
+
+        if i % FLAGS.print_interval == 0:
+            print(f"[{epoch}|{i}] l1 loss: {l1_loss:.5f} rescale loss: {rescale_loss:.5f} [units]")
+        if i % FLAGS.log_interval == 0:
+            wandb.log({"Train L1 loss": to_np(l1_loss), 
+                       "Rescale loss": to_np(rescale_loss)})
+
+        if FLAGS.profile and i == 10:
+            sys.exit()
+    
+        scheduler.step(epoch + i / num_iters)
 
 def test_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
     model.eval()
 
     rloss = 0
-    l1loss = 0
     for i, (g, y) in enumerate(dataloader):
         g = g.to(FLAGS.device)
         y = y.to(FLAGS.device)
 
         # run model forward and compute loss
-        pred = model(g).detach()
-        l1, __, rl = loss_fnc(pred, y, use_mean=False)
+        # pred = model(g).detach()
+        pred, embedding = model(g).detach()
+        __, __, rl = loss_fnc(pred, y, use_mean=False)
         rloss += rl
-        l1loss += l1
     rloss /= FLAGS.test_size
-    l1loss /= FLAGS.test_size
 
-    print(l1loss, rloss)
+    print(f"...[{epoch}|test] rescale loss: {rloss:.5f} [units]")
+    wandb.log({"Test L1 loss": to_np(rloss)})
 
 
 class RandomRotation(object):
@@ -56,33 +86,48 @@ def collate(samples):
     return batched_graph, torch.tensor(y)
 
 def main(FLAGS, UNPARSED_ARGV):
-    # Prepare data
-    test_dataset = QM9Dataset(FLAGS.data_address, 
-                             FLAGS.task, 
-                             mode='test') 
-    test_loader = DataLoader(test_dataset, 
-                             batch_size=FLAGS.batch_size, 
-			     shuffle=False, 
-                             collate_fn=collate, 
-                             num_workers=FLAGS.num_workers)
 
-    FLAGS.test_size = len(test_dataset)
+    # Prepare data
+    train_dataset = AlphaDataset(mode='train', 
+                               transform=RandomRotation())
+#     train_dataset = AlphaDataset(mode='train')
+    train_loader = DataLoader(train_dataset, 
+                              batch_size=FLAGS.batch_size, 
+			      shuffle=True, 
+                              collate_fn=collate, 
+                              num_workers=FLAGS.num_workers)
+
+
+#     test_dataset = AlphaDataset(mode='test') 
+#     test_loader = DataLoader(test_dataset, 
+#                              batch_size=FLAGS.batch_size, 
+# 			     shuffle=False, 
+#                              collate_fn=collate, 
+#                              num_workers=FLAGS.num_workers)
+
+    FLAGS.train_size = len(train_dataset)
+#     FLAGS.test_size = len(test_dataset)
 
     # Choose model
     model = models.__dict__.get(FLAGS.model)(FLAGS.num_layers, 
-                                             test_dataset.atom_feature_size, 
+                                             train_dataset.atom_feature_size, 
                                              FLAGS.num_channels,
                                              num_nlayers=FLAGS.num_nlayers,
                                              num_degrees=FLAGS.num_degrees,
-                                             edge_dim=test_dataset.num_bonds,
+                                             edge_dim=train_dataset.num_bonds,
                                              div=FLAGS.div,
                                              pooling=FLAGS.pooling,
                                              n_heads=FLAGS.head)
-    if not FLAGS.restore:
-        print("FLAGS.restore must be set")
-    model.load_state_dict(torch.load(FLAGS.restore))
-    print(f"Model loaded from {FLAGS.restore}")
+    if FLAGS.restore is not None:
+        model.load_state_dict(torch.load(FLAGS.restore))
     model.to(FLAGS.device)
+    #wandb.watch(model)
+
+    # Optimizer settings
+    optimizer = optim.Adam(model.parameters(), lr=FLAGS.lr)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, 
+                                                               FLAGS.num_epochs, 
+                                                               eta_min=1e-4)
 
     # Loss function
     def task_loss(pred, target, use_mean=True):
@@ -92,14 +137,20 @@ def main(FLAGS, UNPARSED_ARGV):
             l1_loss /= pred.shape[0]
             l2_loss /= pred.shape[0]
 
-        rescale_loss = test_dataset.norm2units(l1_loss, FLAGS.task)
+        rescale_loss = train_dataset.norm2units(l1_loss)
         return l1_loss, l2_loss, rescale_loss
 
     # Save path
+    save_path = os.path.join(FLAGS.save_dir, FLAGS.name + '.pt')
 
     # Run training
-    print('Begin evaluation')
-    test_epoch(0, model, task_loss, test_loader, FLAGS)
+    print('Begin training')
+    for epoch in range(FLAGS.num_epochs):
+        torch.save(model.state_dict(), save_path)
+        print(f"Saved: {save_path}")
+
+        train_epoch(epoch, model, task_loss, train_loader, optimizer, scheduler, FLAGS)
+        # test_epoch(epoch, model, task_loss, test_loader, FLAGS)
 
 
 if __name__ == '__main__':
@@ -125,21 +176,29 @@ if __name__ == '__main__':
     parser.add_argument('--head', type=int, default=1,
             help="Number of attention heads")
 
-    # Data
-    parser.add_argument('--data_address', type=str, default='QM9_data.pt',
-            help="Address to structure file")
-    parser.add_argument('--task', type=str, default='homo',
-            help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
+    # Meta-parameters
+    parser.add_argument('--batch_size', type=int, default=32, 
+            help="Batch size")
+    parser.add_argument('--lr', type=float, default=1e-3, 
+            help="Learning rate")
+    parser.add_argument('--num_epochs', type=int, default=50, 
+            help="Number of epochs")
 
     # Logging
     parser.add_argument('--name', type=str, default=None,
             help="Run name")
+    parser.add_argument('--log_interval', type=int, default=25,
+            help="Number of steps between logging key stats")
+    parser.add_argument('--print_interval', type=int, default=250,
+            help="Number of steps between printing key stats")
+    parser.add_argument('--save_dir', type=str, default="models",
+            help="Directory name to save models")
     parser.add_argument('--restore', type=str, default=None,
             help="Path to model to restore")
+    parser.add_argument('--wandb', type=str, default='equivariant-attention', 
+            help="wandb project name")
 
     # Miscellanea
-    parser.add_argument('--batch_size', type=int, default=32, 
-            help="Batch size")
     parser.add_argument('--num_workers', type=int, default=4, 
             help="Number of data loader workers")
     parser.add_argument('--profile', action='store_true',
@@ -154,6 +213,10 @@ if __name__ == '__main__':
     if not FLAGS.name:
         FLAGS.name = f'E-d{FLAGS.num_degrees}-l{FLAGS.num_layers}-{FLAGS.num_channels}-{FLAGS.num_nlayers}'
 
+    # Create model directory
+    if not os.path.isdir(FLAGS.save_dir):
+        os.makedirs(FLAGS.save_dir)
+
     # Fix seed for random numbers
     if not FLAGS.seed: FLAGS.seed = 1992 #np.random.randint(100000)
     torch.manual_seed(FLAGS.seed)
@@ -161,6 +224,12 @@ if __name__ == '__main__':
 
     # Automatically choose GPU if available
     FLAGS.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+
+    # Log all args to wandb
+    if FLAGS.name:
+        wandb.init(project=f'{FLAGS.wandb}', name=f'{FLAGS.name}')
+    else:
+        wandb.init(project=f'{FLAGS.wandb}')
 
     print("\n\nFLAGS:", FLAGS)
     print("UNPARSED_ARGV:", UNPARSED_ARGV, "\n\n")

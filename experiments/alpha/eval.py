@@ -14,9 +14,12 @@ import torch
 from torch import nn, optim
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from QM9 import QM9Dataset
+from alpha import AlphaDataset
 
-from experiments.qm9 import models #as models
+from experiments.alpha import models #as models
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import pickle
 
 def to_np(x):
     return x.cpu().detach().numpy()
@@ -26,40 +29,59 @@ def test_epoch(epoch, model, loss_fnc, dataloader, FLAGS):
 
     rloss = 0
     l1loss = 0
-    for i, (g, y) in enumerate(dataloader):
+    embed_list = []
+    enrich_list = []
+    seq_dict = {}
+    for i, (g, y, seq) in enumerate(dataloader):
         g = g.to(FLAGS.device)
+        immuno = y[:,:,1]
+        y = y[:,:,0]
         y = y.to(FLAGS.device)
+        enrich_list.append(y.detach().cpu())
 
         # run model forward and compute loss
-        pred = model(g).detach()
-        l1, __, rl = loss_fnc(pred, y, use_mean=False)
+        # pred = model(g).detach()
+        pred, embedding = model(g)
+        embed_list.append(embedding.detach().cpu())
+        l1, __, rl = loss_fnc(pred, y, use_mean=True)
+        l1 = l1.detach()
+        rl = rl.detach()
         rloss += rl
         l1loss += l1
+
+        for i, s in enumerate(seq):
+            seq_dict[s] = embedding[i].detach().cpu().numpy()
     rloss /= FLAGS.test_size
     l1loss /= FLAGS.test_size
 
-    print(l1loss, rloss)
+    embedding = torch.cat(embed_list, dim=0)
+    enrich_list = torch.cat(enrich_list, dim=0).numpy()
+    pca_op = PCA(n_components=2).fit(embedding.numpy())
+    train_pca_coords = pca_op.transform(embedding.numpy())
+    fig, ax = plt.subplots(figsize=(6,5), dpi=155)
 
+    title_ = 'Test Set Latent Space Visualization (single-allelic model)'
+    ax.title.set_text(title_)
+    ax.scatter(train_pca_coords[:,0], train_pca_coords[:,1], c='black', s=1.5, cmap='cool')
+    im1 = ax.scatter(train_pca_coords[:,0], train_pca_coords[:,1], c=enrich_list, s=3.5, cmap='cool')
 
-class RandomRotation(object):
-    def __init__(self):
-        pass
+    cbar = plt.colorbar(im1).set_ticks([])
+    plt.savefig('embedding.png')
 
-    def __call__(self, x):
-        M = np.random.randn(3,3)
-        Q, __ = np.linalg.qr(M)
-        return x @ Q
+    with open('embeddings.pickle', 'wb') as f:
+        pickle.dump(seq_dict, f)
+    
 
 def collate(samples):
-    graphs, y = map(list, zip(*samples))
+    graphs, y, seq = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(y)
+    return batched_graph, torch.tensor(y), seq
 
 def main(FLAGS, UNPARSED_ARGV):
     # Prepare data
-    test_dataset = QM9Dataset(FLAGS.data_address, 
-                             FLAGS.task, 
-                             mode='test') 
+    test_dataset = AlphaDataset(mode='test',
+                                immuno_path='/edward-slow-vol/CPSC_552/immunoai/data/immuno_data_test_IEDB_A0201_HLAseq_2_csv.csv',
+                                structures_path='/edward-slow-vol/CPSC_552/alpha_structure_test') 
     test_loader = DataLoader(test_dataset, 
                              batch_size=FLAGS.batch_size, 
 			     shuffle=False, 
@@ -92,7 +114,7 @@ def main(FLAGS, UNPARSED_ARGV):
             l1_loss /= pred.shape[0]
             l2_loss /= pred.shape[0]
 
-        rescale_loss = test_dataset.norm2units(l1_loss, FLAGS.task)
+        rescale_loss = test_dataset.norm2units(l1_loss)
         return l1_loss, l2_loss, rescale_loss
 
     # Save path
@@ -128,8 +150,6 @@ if __name__ == '__main__':
     # Data
     parser.add_argument('--data_address', type=str, default='QM9_data.pt',
             help="Address to structure file")
-    parser.add_argument('--task', type=str, default='homo',
-            help="QM9 task ['homo, 'mu', 'alpha', 'lumo', 'gap', 'r2', 'zpve', 'u0', 'u298', 'h298', 'g298', 'cv']")
 
     # Logging
     parser.add_argument('--name', type=str, default=None,

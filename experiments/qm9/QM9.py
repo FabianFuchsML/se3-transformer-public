@@ -199,7 +199,7 @@ if __name__ == "__main__":
         batched_graph = dgl.batch(graphs)
         return batched_graph, torch.tensor(y)
 
-    dataset = QM9Dataset('./unsanitized.pt', "homo", mode='train', fully_connected=True)
+    dataset = QM9Dataset('./QM9_data.pt', "homo", mode='train', fully_connected=True)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=collate)
 
     for data in dataloader:
