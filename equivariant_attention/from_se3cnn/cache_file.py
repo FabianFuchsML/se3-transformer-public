@@ -6,7 +6,10 @@ import pickle
 import gzip
 import os
 import sys
-import fcntl
+if sys.platform == 'win32':
+  import msvcrt
+else:
+  import fcntl
 
 
 class FileSystemMutex:
@@ -24,7 +27,10 @@ class FileSystemMutex:
         if it is already locked, it waits (blocking function)
         '''
         self.handle = open(self.filename, 'w')
-        fcntl.lockf(self.handle, fcntl.LOCK_EX)
+        if sys.platform == 'win32':
+            msvcrt.locking(self._fo.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            fcntl.lockf(self.handle, fcntl.LOCK_EX)
         self.handle.write("{}\n".format(os.getpid()))
         self.handle.flush()
 
@@ -34,7 +40,10 @@ class FileSystemMutex:
         '''
         if self.handle is None:
             raise RuntimeError()
-        fcntl.lockf(self.handle, fcntl.LOCK_UN)
+        if sys.platform == 'win32':
+            msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.lockf(self.handle, fcntl.LOCK_UN)
         self.handle.close()
         self.handle = None
 
